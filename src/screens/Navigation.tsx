@@ -24,6 +24,7 @@ import PaymentScreen from './Selectpayment.tsx'
 import NameCard from './NameCard.tsx'
 import FoodItem from './FoodItem.tsx'
 import RestaurantHomePage from './RestaurantHomePage.tsx';
+import WalletPage from './WalletPage.tsx';
 
 
 
@@ -69,6 +70,7 @@ const Navigation = () => {
         <Stack.Screen name="NameCard" component={NameCard} />
         <Stack.Screen name="FoodItem" component={FoodItem} />
         <Stack.Screen name = "RestaurantHomePage" component={RestaurantHomePage} />
+        <Stack.Screen name="WalletPage" component={WalletPage} />
         
 
 

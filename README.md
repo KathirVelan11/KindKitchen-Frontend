@@ -1,34 +1,80 @@
 # KindKitchen — Frontend (Expo / React Native)
 
-Mobile + web client for KindKitchen, a food-donation platform connecting
-**Restaurants**, **NGOs**, **Donors**, and **Delivery Agents**.
+KindKitchen is a food-donation platform that connects **Restaurants**, **NGOs**,
+**Donors**, and **Delivery Agents** so surplus food and donations reach people in need.
 
-## Stack
-- Expo (~52) + React Native 0.76
-- React Navigation (native stack)
-- TypeScript
+This repo is the mobile + web client (Expo / React Native + TypeScript).
+The API lives in **KindKitchen-Backend**.
 
-## Quick start
+---
+
+## How to run & see the app
+
+### 1. Start the backend first
+See the `KindKitchen-Backend` README. In short:
+```bash
+docker run -d --name kk-postgres -e POSTGRES_PASSWORD=12122005 \
+  -e POSTGRES_USER=postgres -e POSTGRES_DB=kathir -p 5432:5432 postgres:16
+pip install -r requirements.txt
+cd "Fastapi backend" && cp .env.example .env
+uvicorn main:app --port 8000
+```
+Backend is now at http://localhost:8000 (docs at /docs).
+
+### 2. Run the app
 ```bash
 npm install --legacy-peer-deps
-npm run web        # opens the app in the browser (easiest for testing)
-# or:  npm start   # then scan the QR with Expo Go on a phone
+npm run web        # easiest — opens in your browser at http://localhost:8081
+# or: npm start    # then scan the QR code with the Expo Go app on your phone
 ```
 
-> Make sure the **backend** is running first (see KindKitchen-Backend, default `http://localhost:8000`).
-
-## Configuring the backend URL
-All API calls use a single constant in [`src/screens/config.ts`](src/screens/config.ts):
+### 3. Point the app at your backend
+All API calls read one constant — [`src/screens/config.ts`](src/screens/config.ts):
 ```ts
 export const API_BASE_URL = 'http://localhost:8000';
 ```
 - **Browser (web):** keep `localhost`.
-- **Android emulator:** use `http://10.0.2.2:8000`.
-- **Physical phone:** use your computer's LAN IP, e.g. `http://192.168.1.5:8000`.
+- **Android emulator:** `http://10.0.2.2:8000`.
+- **Real phone (Expo Go):** your PC's LAN IP, e.g. `http://192.168.1.5:8000`.
 
-## Roles & main screens
-- **Login / SignUp** → role select → role-specific signup (address auto-filled via geolocation).
-- **Restaurant:** dashboard, post food, view orders.
-- **NGO:** browse food, place orders (wallet/UPI), wallet & donations.
-- **Donor:** browse NGOs, donate (payment gateway).
-- **Delivery Agent:** see pending pickups, claim orders.
+---
+
+## What the app does (functionality)
+
+**Accounts & auth**
+- Email/password **sign up** and **login** (JWT). After signing up you pick a role.
+- Role-based routing sends each user to the right home screen.
+
+**Restaurant**
+- Dashboard, **post surplus food** (name, qty, price, veg/non-veg, expiry, photo).
+- View incoming **orders** for the restaurant.
+
+**NGO**
+- Browse available food and **place orders** (pay from wallet / UPI).
+- **Wallet** page: live balance + list of donations received.
+- Wallet is auto-created on registration and credited when donors give.
+
+**Donor**
+- Browse NGOs and **donate** with a real payment flow:
+  pick NGO → enter amount → choose method → pay → success (NGO wallet credited).
+- Payments go through the backend **Razorpay** gateway, which runs in **mock mode**
+  out of the box (no keys / no real charge) and upgrades to live by adding keys.
+
+**Delivery Agent**
+- See **pending pickups** (restaurant → NGO addresses) and **claim** an order.
+
+---
+
+## Project structure
+```
+src/screens/
+  config.ts            # single source of the backend URL
+  AuthContext.tsx      # logged-in user context
+  auth.js              # in-memory token / userId / role
+  Navigation.tsx       # all routes
+  LoginScreen.tsx, *Signup*.tsx, *dash*.tsx, NgoHomePage.tsx,
+  Donate_screen.tsx, Selectpayment.tsx, WalletPage.tsx, ...
+```
+
+## Tech
+Expo ~52 · React Native 0.76 · React Navigation (native stack) · TypeScript

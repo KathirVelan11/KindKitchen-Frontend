@@ -1,13 +1,10 @@
-// screens/WalletPage.js
+// screens/WalletPage.tsx
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  SafeAreaView,
-  Image
+import {
+  View, Text, StyleSheet, FlatList, SafeAreaView, ActivityIndicator,
 } from 'react-native';
+import { API_BASE_URL } from './config';
+import { getUserId, getAuthToken } from './auth.js';
 
 interface Transaction {
   id: string;
@@ -18,35 +15,47 @@ interface Transaction {
 
 const WalletPage = () => {
   const [balance, setBalance] = useState(0);
+  const [ngoName, setNgoName] = useState('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Function to fetch wallet data
   const fetchWalletData = async () => {
     try {
-      // In a real app, this would be an API call
-      // const response = await fetch('https://your-api.com/wallet');
-      // const data = await response.json();
-      // setBalance(data.balance);
-      // setTransactions(data.transactions);
+      const userId = getUserId();
+      if (!userId) { setError('Not logged in'); setLoading(false); return; }
 
-      // For demonstration purposes, using sample data
-      setBalance(50000);
-      setTransactions([
-        { id: '1', donor: 'Cafeteria', amount: 5000, date: '2023-04-10' },
-        { id: '2', donor: 'Scholarship', amount: 20000, date: '2023-03-15' },
-        { id: '3', donor: 'Refund', amount: 2500, date: '2023-02-28' },
-      ]);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching wallet data:', error);
+      // 1. Resolve this NGO + live wallet balance
+      const ngoRes = await fetch(`${API_BASE_URL}/ngos/by-user/${userId}`);
+      const ngo = await ngoRes.json();
+      if (!ngoRes.ok) throw new Error(ngo.detail || 'Could not load NGO');
+      setBalance(ngo.walletbalance);
+      setNgoName(ngo.name);
+
+      // 2. Load donations received (requires auth token)
+      const token = getAuthToken();
+      const donRes = await fetch(`${API_BASE_URL}/donors/ngodonations/${ngo.ngoid}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (donRes.ok) {
+        const dons = await donRes.json();
+        setTransactions(
+          (dons || []).map((d: any, i: number) => ({
+            id: String(i),
+            donor: d.donor_name,
+            amount: d.amount,
+            date: (d.date || '').slice(0, 10),
+          }))
+        );
+      }
+    } catch (e: any) {
+      setError(e.message || 'Failed to load wallet');
+    } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchWalletData();
-  }, []);
+  useEffect(() => { fetchWalletData(); }, []);
 
   const renderTransactionItem = ({ item }: { item: Transaction }) => (
     <View style={styles.transactionItem}>
@@ -59,7 +68,7 @@ const WalletPage = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <Text>Loading...</Text>
+        <ActivityIndicator color="#e2834c" size="large" />
       </SafeAreaView>
     );
   }
@@ -67,33 +76,28 @@ const WalletPage = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Wallet Icon and Balance */}
-        <View style={styles.balanceContainer}>
-          <Image 
-            source={{ uri: 'https://example.com/wallet.png' }} 
-            style={styles.walletIcon} 
-          />
-          <Text style={styles.balanceLabel}>Balance : </Text>
-          <Text style={styles.balanceAmount}>₹{balance}</Text>
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>{ngoName || 'Wallet'} Balance</Text>
+          <Text style={styles.balanceAmount}>₹{balance.toFixed(2)}</Text>
         </View>
 
-        {/* Transaction Headers */}
+        {error && <Text style={styles.error}>{error}</Text>}
+
+        <Text style={styles.sectionTitle}>Donations Received</Text>
         <View style={styles.transactionHeader}>
           <Text style={styles.headerText}>Donor</Text>
-          <Text style={styles.headerText}>Amount</Text>
-          <Text style={styles.headerText}>Date</Text>
+          <Text style={[styles.headerText, { textAlign: 'center' }]}>Amount</Text>
+          <Text style={[styles.headerText, { textAlign: 'right' }]}>Date</Text>
         </View>
-
-        {/* Divider Line */}
         <View style={styles.divider} />
 
-        {/* Transaction List */}
         <FlatList
           data={transactions}
           renderItem={renderTransactionItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           style={styles.transactionList}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={<Text style={styles.empty}>No donations yet.</Text>}
         />
       </View>
     </SafeAreaView>
@@ -101,83 +105,24 @@ const WalletPage = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f8f0e3',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f0e3',
-  },
-  container: {
-    flex: 1,
-    padding: 15,
-  },
-  balanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 30,
-  },
-  walletIcon: {
-    width: 60,
-    height: 60,
-    marginRight: 10,
-  },
-  balanceLabel: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  balanceAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  transactionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#ddd',
-    marginBottom: 10,
-  },
-  transactionList: {
-    flex: 1,
-  },
-  listContent: {
-    paddingBottom: 20,
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  donor: {
-    fontSize: 16,
-    flex: 1,
-  },
-  amount: {
-    fontSize: 16,
-    flex: 1,
-    textAlign: 'center',
-  },
-  date: {
-    fontSize: 16,
-    flex: 1,
-    textAlign: 'right',
-  },
+  safeArea: { flex: 1, backgroundColor: '#f8f0e3' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f0e3' },
+  container: { flex: 1, padding: 15 },
+  balanceCard: { backgroundColor: '#e2834c', borderRadius: 18, paddingVertical: 28, alignItems: 'center', marginVertical: 20 },
+  balanceLabel: { fontSize: 16, color: '#fff7f0', marginBottom: 6 },
+  balanceAmount: { fontSize: 36, fontWeight: 'bold', color: '#fff' },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#7a3e12', marginBottom: 12 },
+  error: { color: '#c0392b', marginBottom: 10 },
+  transactionHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, marginBottom: 10 },
+  headerText: { fontSize: 15, fontWeight: 'bold', flex: 1, color: '#7a3e12' },
+  divider: { height: 1, backgroundColor: '#ddd', marginBottom: 10 },
+  transactionList: { flex: 1 },
+  listContent: { paddingBottom: 20 },
+  empty: { color: '#9a7a63', fontStyle: 'italic', textAlign: 'center', marginTop: 20 },
+  transactionItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 15, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  donor: { fontSize: 16, flex: 1, color: '#333' },
+  amount: { fontSize: 16, flex: 1, textAlign: 'center', color: '#2e9e5b', fontWeight: '600' },
+  date: { fontSize: 14, flex: 1, textAlign: 'right', color: '#777' },
 });
 
 export default WalletPage;
